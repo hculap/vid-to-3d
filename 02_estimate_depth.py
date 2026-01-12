@@ -9,6 +9,7 @@ from typing import List
 import numpy as np
 import torch
 from PIL import Image
+from tqdm import tqdm
 from transformers import pipeline
 
 
@@ -42,6 +43,12 @@ def parse_args() -> argparse.Namespace:
         default="auto",
         choices=["auto", "mps", "cuda", "cpu"],
         help="Device for inference",
+    )
+    parser.add_argument(
+        "--max-frames",
+        type=int,
+        default=None,
+        help="Maximum number of frames to process",
     )
     return parser.parse_args()
 
@@ -162,15 +169,18 @@ def main() -> None:
     device = get_device(args.device)
     pipe = load_model(args.model, device)
 
-    # Process first frame to verify model works and save outputs
-    if frames:
-        frame_path = frames[0]
+    # Limit frames if --max-frames specified
+    if args.max_frames is not None:
+        frames = frames[:args.max_frames]
+        print(f"Processing {len(frames)} frames (limited by --max-frames)")
+
+    # Process all frames with progress bar
+    for frame_path in tqdm(frames, desc="Processing frames"):
         basename = frame_path.stem
-        print(f"Processing: {frame_path.name}")
         depth = process_frame(pipe, frame_path)
-        print(f"Depth map shape: {depth.shape}")
         save_depth(depth, args.out_dir, basename)
-        print(f"Saved: {basename}.npy and {basename}_viz.png")
+
+    print(f"Processed {len(frames)} frames")
 
 
 if __name__ == "__main__":
