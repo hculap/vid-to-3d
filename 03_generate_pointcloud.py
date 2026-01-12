@@ -2,9 +2,10 @@
 """Generate colored point cloud from frames and depth maps."""
 
 import argparse
+import math
 import sys
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 
 def parse_args() -> argparse.Namespace:
@@ -30,6 +31,36 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         required=True,
         help="Output directory for point cloud",
+    )
+    parser.add_argument(
+        "--fov_deg",
+        type=float,
+        default=60.0,
+        help="Field of view in degrees (for computing focal length)",
+    )
+    parser.add_argument(
+        "--fx",
+        type=float,
+        default=None,
+        help="Explicit focal length x (overrides --fov_deg)",
+    )
+    parser.add_argument(
+        "--fy",
+        type=float,
+        default=None,
+        help="Explicit focal length y (overrides --fov_deg)",
+    )
+    parser.add_argument(
+        "--cx",
+        type=float,
+        default=None,
+        help="Principal point x (default: image width / 2)",
+    )
+    parser.add_argument(
+        "--cy",
+        type=float,
+        default=None,
+        help="Principal point y (default: image height / 2)",
     )
     return parser.parse_args()
 
@@ -84,6 +115,41 @@ def validate_directories(frames_dir: Path, depth_dir: Path) -> None:
         sys.exit(1)
 
 
+def compute_intrinsics(
+    width: int,
+    height: int,
+    fov_deg: float,
+    fx: Optional[float] = None,
+    fy: Optional[float] = None,
+    cx: Optional[float] = None,
+    cy: Optional[float] = None,
+) -> Tuple[float, float, float, float]:
+    """Compute camera intrinsics from FOV or explicit values.
+
+    Args:
+        width: Image width
+        height: Image height
+        fov_deg: Field of view in degrees
+        fx: Explicit focal length x (optional)
+        fy: Explicit focal length y (optional)
+        cx: Principal point x (optional)
+        cy: Principal point y (optional)
+
+    Returns:
+        Tuple of (fx, fy, cx, cy)
+    """
+    if fx is None:
+        fx = width / (2 * math.tan(math.radians(fov_deg) / 2))
+    if fy is None:
+        fy = fx
+    if cx is None:
+        cx = width / 2.0
+    if cy is None:
+        cy = height / 2.0
+
+    return fx, fy, cx, cy
+
+
 def main() -> None:
     """Main entry point."""
     args = parse_args()
@@ -106,6 +172,13 @@ def main() -> None:
         sys.exit(1)
 
     print(f"Output directory: {args.out_dir}")
+
+    # Compute intrinsics using placeholder dimensions (will be updated per frame)
+    # For logging, use default 640x480
+    fx, fy, cx, cy = compute_intrinsics(
+        640, 480, args.fov_deg, args.fx, args.fy, args.cx, args.cy
+    )
+    print(f"Camera intrinsics: fx={fx:.2f}, fy={fy:.2f}, cx={cx:.2f}, cy={cy:.2f}")
 
 
 if __name__ == "__main__":
