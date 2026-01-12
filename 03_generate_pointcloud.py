@@ -7,6 +7,10 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+import numpy as np
+import open3d as o3d
+from PIL import Image
+
 
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
@@ -150,6 +154,71 @@ def compute_intrinsics(
     return fx, fy, cx, cy
 
 
+def depth_to_pointcloud(
+    rgb_path: Path,
+    depth_path: Path,
+    fx: float,
+    fy: float,
+    cx: float,
+    cy: float,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Convert a single frame + depth to 3D points with colors.
+
+    Uses the pinhole camera model to project depth pixels to 3D:
+        X = (u - cx) * Z / fx
+        Y = (v - cy) * Z / fy
+        Z = depth
+
+    Args:
+        rgb_path: Path to RGB image
+        depth_path: Path to depth .npy file
+        fx, fy: Focal lengths
+        cx, cy: Principal point
+
+    Returns:
+        Tuple of (points [N, 3], colors [N, 3] normalized 0-1)
+    """
+    rgb = np.array(Image.open(rgb_path))
+    depth = np.load(depth_path)
+
+    # Resize RGB to match depth if needed
+    if rgb.shape[:2] != depth.shape:
+        rgb_pil = Image.open(rgb_path).resize((depth.shape[1], depth.shape[0]))
+        rgb = np.array(rgb_pil)
+
+    height, width = depth.shape
+    u, v = np.meshgrid(np.arange(width), np.arange(height))
+
+    z = depth.flatten()
+    x = ((u.flatten() - cx) * z) / fx
+    y = ((v.flatten() - cy) * z) / fy
+
+    points = np.stack([x, -y, -z], axis=-1)  # Flip Y and Z for standard 3D coords
+
+    colors = rgb.reshape(-1, 3) / 255.0
+
+    # Filter out invalid depth (zeros or too far)
+    valid = z > 0
+    points = points[valid]
+    colors = colors[valid]
+
+    return points, colors
+
+
+def save_ply(points: np.ndarray, colors: np.ndarray, out_path: Path) -> None:
+    """Save point cloud as PLY file.
+
+    Args:
+        points: [N, 3] array of xyz positions
+        colors: [N, 3] array of RGB colors (0-1)
+        out_path: Output PLY file path
+    """
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(points)
+    pcd.colors = o3d.utility.Vector3dVector(colors)
+    o3d.io.write_point_cloud(str(out_path), pcd)
+
+
 def main() -> None:
     """Main entry point."""
     args = parse_args()
@@ -173,12 +242,24 @@ def main() -> None:
 
     print(f"Output directory: {args.out_dir}")
 
-    # Compute intrinsics using placeholder dimensions (will be updated per frame)
-    # For logging, use default 640x480
+    # Process first frame to get dimensions for intrinsics
+    rgb_path, depth_path = pairs[0]
+    depth = np.load(depth_path)
+    height, width = depth.shape
+
     fx, fy, cx, cy = compute_intrinsics(
-        640, 480, args.fov_deg, args.fx, args.fy, args.cx, args.cy
+        width, height, args.fov_deg, args.fx, args.fy, args.cx, args.cy
     )
     print(f"Camera intrinsics: fx={fx:.2f}, fy={fy:.2f}, cx={cx:.2f}, cy={cy:.2f}")
+
+    # Generate point cloud from single frame
+    print(f"Processing: {rgb_path.name}")
+    points, colors = depth_to_pointcloud(rgb_path, depth_path, fx, fy, cx, cy)
+    print(f"Generated {len(points)} points")
+
+    out_path = args.out_dir / "point_cloud.ply"
+    save_ply(points, colors, out_path)
+    print(f"Saved: {out_path}")
 
 
 if __name__ == "__main__":
