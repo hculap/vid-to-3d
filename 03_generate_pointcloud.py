@@ -281,17 +281,32 @@ def main() -> None:
     )
     print(f"Camera intrinsics: fx={fx:.2f}, fy={fy:.2f}, cx={cx:.2f}, cy={cy:.2f}")
 
-    # Generate point cloud from single frame
-    print(f"Processing: {rgb_path.name}")
+    # Process all frames and merge into one point cloud
+    # NOTE: This is a naive merge that simply concatenates all points.
+    # Without camera pose estimation (SLAM/SfM), frames are not aligned in 3D space.
+    # For a proper reconstruction, camera poses would need to be estimated and
+    # each frame's points transformed to a common coordinate system.
     print(f"Subsampling: pixel_stride={args.pixel_stride}, max_points_per_frame={args.max_points_per_frame}")
-    points, colors = depth_to_pointcloud(
-        rgb_path, depth_path, fx, fy, cx, cy,
-        args.pixel_stride, args.max_points_per_frame
-    )
-    print(f"Generated {len(points)} points")
+
+    all_points = []
+    all_colors = []
+
+    for rgb_path, depth_path in pairs:
+        print(f"Processing: {rgb_path.name}")
+        points, colors = depth_to_pointcloud(
+            rgb_path, depth_path, fx, fy, cx, cy,
+            args.pixel_stride, args.max_points_per_frame
+        )
+        all_points.append(points)
+        all_colors.append(colors)
+        print(f"  -> {len(points)} points")
+
+    merged_points = np.vstack(all_points)
+    merged_colors = np.vstack(all_colors)
+    print(f"Total: {len(merged_points)} points from {len(pairs)} frames")
 
     out_path = args.out_dir / "point_cloud.ply"
-    save_ply(points, colors, out_path)
+    save_ply(merged_points, merged_colors, out_path)
     print(f"Saved: {out_path}")
 
 
