@@ -66,6 +66,18 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Principal point y (default: image height / 2)",
     )
+    parser.add_argument(
+        "--pixel_stride",
+        type=int,
+        default=2,
+        help="Sample every Nth pixel in each dimension",
+    )
+    parser.add_argument(
+        "--max_points_per_frame",
+        type=int,
+        default=None,
+        help="Maximum points to keep per frame (random subsample)",
+    )
     return parser.parse_args()
 
 
@@ -161,6 +173,8 @@ def depth_to_pointcloud(
     fy: float,
     cx: float,
     cy: float,
+    pixel_stride: int = 2,
+    max_points: Optional[int] = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Convert a single frame + depth to 3D points with colors.
 
@@ -174,6 +188,8 @@ def depth_to_pointcloud(
         depth_path: Path to depth .npy file
         fx, fy: Focal lengths
         cx, cy: Principal point
+        pixel_stride: Sample every Nth pixel in each dimension
+        max_points: Maximum number of points to return (random subsample)
 
     Returns:
         Tuple of (points [N, 3], colors [N, 3] normalized 0-1)
@@ -187,20 +203,33 @@ def depth_to_pointcloud(
         rgb = np.array(rgb_pil)
 
     height, width = depth.shape
-    u, v = np.meshgrid(np.arange(width), np.arange(height))
 
-    z = depth.flatten()
+    # Apply pixel stride subsampling
+    u, v = np.meshgrid(
+        np.arange(0, width, pixel_stride),
+        np.arange(0, height, pixel_stride)
+    )
+    depth_sub = depth[::pixel_stride, ::pixel_stride]
+    rgb_sub = rgb[::pixel_stride, ::pixel_stride]
+
+    z = depth_sub.flatten()
     x = ((u.flatten() - cx) * z) / fx
     y = ((v.flatten() - cy) * z) / fy
 
     points = np.stack([x, -y, -z], axis=-1)  # Flip Y and Z for standard 3D coords
 
-    colors = rgb.reshape(-1, 3) / 255.0
+    colors = rgb_sub.reshape(-1, 3) / 255.0
 
     # Filter out invalid depth (zeros or too far)
     valid = z > 0
     points = points[valid]
     colors = colors[valid]
+
+    # Random subsample if max_points specified
+    if max_points is not None and len(points) > max_points:
+        indices = np.random.choice(len(points), max_points, replace=False)
+        points = points[indices]
+        colors = colors[indices]
 
     return points, colors
 
@@ -254,7 +283,11 @@ def main() -> None:
 
     # Generate point cloud from single frame
     print(f"Processing: {rgb_path.name}")
-    points, colors = depth_to_pointcloud(rgb_path, depth_path, fx, fy, cx, cy)
+    print(f"Subsampling: pixel_stride={args.pixel_stride}, max_points_per_frame={args.max_points_per_frame}")
+    points, colors = depth_to_pointcloud(
+        rgb_path, depth_path, fx, fy, cx, cy,
+        args.pixel_stride, args.max_points_per_frame
+    )
     print(f"Generated {len(points)} points")
 
     out_path = args.out_dir / "point_cloud.ply"
