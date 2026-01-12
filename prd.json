@@ -1,0 +1,252 @@
+{
+  "project": "vid-to-3d",
+  "branchName": "ralph/video-to-3d-pipeline",
+  "description": "Video to 3D Room - Convert video of a room into a walkable 3D point cloud scene",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Create frame extraction CLI script",
+      "description": "As a developer, I need a script to extract frames from video files.",
+      "acceptanceCriteria": [
+        "Create 01_extract_frames.py with argparse CLI",
+        "Accept --video path and --out_dir arguments",
+        "Use OpenCV to read video and extract frames",
+        "python 01_extract_frames.py --help shows usage",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Add frame sampling to extraction",
+      "description": "As a user, I want to sample every Nth frame to reduce processing time.",
+      "acceptanceCriteria": [
+        "Add --every N flag (default 15) to sample frames",
+        "Add --start and --end optional frame bounds",
+        "Extracted count roughly equals total_frames / every",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Add resize and quality options to frame extraction",
+      "description": "As a user, I want to control output frame size and JPEG quality.",
+      "acceptanceCriteria": [
+        "Add --width and --height flags (default 640x480)",
+        "Add --quality flag for JPEG compression (default 85)",
+        "Output JPG dimensions match configured size",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Create depth estimation CLI script",
+      "description": "As a developer, I need a script to generate depth maps from frames.",
+      "acceptanceCriteria": [
+        "Create 02_estimate_depth.py with argparse CLI",
+        "Accept --frames_dir and --out_dir arguments",
+        "Exit with clear error if frames/ is missing or empty",
+        "python 02_estimate_depth.py --help shows usage",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Load Depth-Anything model",
+      "description": "As a developer, I need to load the depth estimation model.",
+      "acceptanceCriteria": [
+        "Load Depth-Anything-Small via Transformers pipeline",
+        "Add --model flag to configure model ID",
+        "First run downloads model successfully",
+        "Process at least 1 frame to verify",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Add device selection for depth estimation",
+      "description": "As a user, I want to choose GPU/CPU for inference.",
+      "acceptanceCriteria": [
+        "Add --device flag: auto|mps|cuda|cpu (default auto)",
+        "Auto-detect MPS on Apple Silicon, CUDA if available",
+        "Log which device is being used",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Generate depth maps with visualization",
+      "description": "As a user, I want depth maps saved as .npy and viewable PNGs.",
+      "acceptanceCriteria": [
+        "Save depth/<basename>.npy as float32 HxW array",
+        "Save depth/<basename>_viz.png with colormap visualization",
+        "NPY loads correctly with numpy",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Add batch processing with progress bar",
+      "description": "As a user, I want to see progress and limit frame count.",
+      "acceptanceCriteria": [
+        "Process all frames with tqdm progress bar",
+        "Add --max-frames flag to limit processing",
+        "--max-frames 5 processes only 5 frames",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Create point cloud generation CLI script",
+      "description": "As a developer, I need a script to convert frames+depth to 3D.",
+      "acceptanceCriteria": [
+        "Create 03_generate_pointcloud.py with argparse CLI",
+        "Accept --frames_dir, --depth_dir, --out_dir arguments",
+        "Match frame basenames to depth basenames",
+        "Report missing pairs clearly",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Implement camera intrinsics",
+      "description": "As a developer, I need camera parameters for 3D projection.",
+      "acceptanceCriteria": [
+        "Add --fov_deg flag (default 60) for focal length from FOV",
+        "Add optional --fx --fy --cx --cy for explicit intrinsics",
+        "Log intrinsics values being used",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Generate point cloud from single frame",
+      "description": "As a user, I want to create a colored point cloud from one frame.",
+      "acceptanceCriteria": [
+        "Project depth pixels to 3D using pinhole camera model",
+        "Assign RGB colors from original frame",
+        "Export as PLY file to output/",
+        "PLY has point count > 0",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Add subsampling controls",
+      "description": "As a user, I want to control point cloud density.",
+      "acceptanceCriteria": [
+        "Add --pixel_stride flag (default 2) to skip pixels",
+        "Add --max_points_per_frame flag",
+        "Changing stride changes output point count",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Merge multiple frames into one point cloud",
+      "description": "As a user, I want all frames combined into one scene.",
+      "acceptanceCriteria": [
+        "Concatenate point clouds from all frames",
+        "Multi-frame output has more points than single-frame",
+        "Document naive merge limitations in code comments",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Create Three.js viewer HTML",
+      "description": "As a user, I want to view the point cloud in browser.",
+      "acceptanceCriteria": [
+        "Create viewer.html with embedded Three.js",
+        "Load output/point_cloud.ply using PLYLoader from CDN",
+        "Point cloud renders when served via python -m http.server",
+        "Verify in browser"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-015",
+      "title": "Add first-person navigation controls",
+      "description": "As a user, I want to walk through the 3D scene.",
+      "acceptanceCriteria": [
+        "Add PointerLockControls for mouse look",
+        "WASD keys move camera forward/back/left/right",
+        "ESC key unlocks pointer",
+        "Verify in browser"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-016",
+      "title": "Add viewer UI overlay",
+      "description": "As a user, I want basic controls in the viewer.",
+      "acceptanceCriteria": [
+        "Show controls instructions overlay",
+        "Add point size slider that changes rendering",
+        "Add reset view button",
+        "Slider works without page reload",
+        "Verify in browser"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-017",
+      "title": "Create pipeline runner script",
+      "description": "As a user, I want one command to run the full pipeline.",
+      "acceptanceCriteria": [
+        "Create run_pipeline.sh bash script",
+        "Run 01 -> 02 -> 03 scripts in sequence",
+        "Accept video path as argument",
+        "One command produces output/point_cloud.ply",
+        "Script is executable"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
