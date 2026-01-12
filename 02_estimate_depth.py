@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from typing import List
 
+import numpy as np
 import torch
 from PIL import Image
 from transformers import pipeline
@@ -115,19 +116,39 @@ def load_model(model_id: str, device: str):
     return pipe
 
 
-def process_frame(pipe, frame_path: Path) -> Image.Image:
-    """Process a single frame and return depth map.
+def process_frame(pipe, frame_path: Path) -> np.ndarray:
+    """Process a single frame and return depth map as numpy array.
 
     Args:
         pipe: Depth estimation pipeline
         frame_path: Path to input frame
 
     Returns:
-        Depth map as PIL Image
+        Depth map as float32 HxW numpy array
     """
     image = Image.open(frame_path)
     result = pipe(image)
-    return result["depth"]
+    depth_image = result["depth"]
+    depth_array = np.array(depth_image, dtype=np.float32)
+    return depth_array
+
+
+def save_depth(depth: np.ndarray, out_dir: Path, basename: str) -> None:
+    """Save depth map as .npy and visualization .png.
+
+    Args:
+        depth: Depth map as float32 HxW numpy array
+        out_dir: Output directory
+        basename: Base filename (without extension)
+    """
+    npy_path = out_dir / f"{basename}.npy"
+    np.save(npy_path, depth)
+
+    depth_normalized = (depth - depth.min()) / (depth.max() - depth.min() + 1e-8)
+    depth_viz = (depth_normalized * 255).astype(np.uint8)
+    viz_image = Image.fromarray(depth_viz)
+    viz_path = out_dir / f"{basename}_viz.png"
+    viz_image.save(viz_path)
 
 
 def main() -> None:
@@ -141,12 +162,15 @@ def main() -> None:
     device = get_device(args.device)
     pipe = load_model(args.model, device)
 
-    # Process first frame to verify model works
+    # Process first frame to verify model works and save outputs
     if frames:
-        print(f"Testing with first frame: {frames[0].name}")
-        depth = process_frame(pipe, frames[0])
-        print(f"Depth map size: {depth.size}")
-        print("Model verification complete")
+        frame_path = frames[0]
+        basename = frame_path.stem
+        print(f"Processing: {frame_path.name}")
+        depth = process_frame(pipe, frame_path)
+        print(f"Depth map shape: {depth.shape}")
+        save_depth(depth, args.out_dir, basename)
+        print(f"Saved: {basename}.npy and {basename}_viz.png")
 
 
 if __name__ == "__main__":
