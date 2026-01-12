@@ -4,6 +4,10 @@
 import argparse
 import sys
 from pathlib import Path
+from typing import List
+
+from PIL import Image
+from transformers import pipeline
 
 
 def parse_args() -> argparse.Namespace:
@@ -24,10 +28,16 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="Output directory for depth maps",
     )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="LiheYoung/depth-anything-small-hf",
+        help="Model ID for depth estimation",
+    )
     return parser.parse_args()
 
 
-def validate_frames_dir(frames_dir: Path) -> list[Path]:
+def validate_frames_dir(frames_dir: Path) -> List[Path]:
     """Validate frames directory and return list of image files.
 
     Args:
@@ -61,6 +71,36 @@ def validate_frames_dir(frames_dir: Path) -> list[Path]:
     return frames
 
 
+def load_model(model_id: str):
+    """Load depth estimation model via transformers pipeline.
+
+    Args:
+        model_id: HuggingFace model ID
+
+    Returns:
+        Depth estimation pipeline
+    """
+    print(f"Loading model: {model_id}")
+    pipe = pipeline(task="depth-estimation", model=model_id)
+    print("Model loaded successfully")
+    return pipe
+
+
+def process_frame(pipe, frame_path: Path) -> Image.Image:
+    """Process a single frame and return depth map.
+
+    Args:
+        pipe: Depth estimation pipeline
+        frame_path: Path to input frame
+
+    Returns:
+        Depth map as PIL Image
+    """
+    image = Image.open(frame_path)
+    result = pipe(image)
+    return result["depth"]
+
+
 def main() -> None:
     """Main entry point."""
     args = parse_args()
@@ -68,6 +108,15 @@ def main() -> None:
     args.out_dir.mkdir(parents=True, exist_ok=True)
     print(f"Found {len(frames)} frames in {args.frames_dir}")
     print(f"Output directory: {args.out_dir}")
+
+    pipe = load_model(args.model)
+
+    # Process first frame to verify model works
+    if frames:
+        print(f"Testing with first frame: {frames[0].name}")
+        depth = process_frame(pipe, frames[0])
+        print(f"Depth map size: {depth.size}")
+        print("Model verification complete")
 
 
 if __name__ == "__main__":
