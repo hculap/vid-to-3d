@@ -45,6 +45,24 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="End frame index (exclusive)",
     )
+    parser.add_argument(
+        "--width",
+        type=int,
+        default=640,
+        help="Output frame width",
+    )
+    parser.add_argument(
+        "--height",
+        type=int,
+        default=480,
+        help="Output frame height",
+    )
+    parser.add_argument(
+        "--quality",
+        type=int,
+        default=85,
+        help="JPEG compression quality (0-100)",
+    )
     return parser.parse_args()
 
 
@@ -54,6 +72,9 @@ def extract_frames(
     every: int = 15,
     start: Optional[int] = None,
     end: Optional[int] = None,
+    width: int = 640,
+    height: int = 480,
+    quality: int = 85,
 ) -> int:
     """Extract frames from video with sampling.
 
@@ -63,6 +84,9 @@ def extract_frames(
         every: Sample every Nth frame
         start: Start frame index (0-based, inclusive)
         end: End frame index (exclusive)
+        width: Output frame width
+        height: Output frame height
+        quality: JPEG compression quality (0-100)
 
     Returns:
         Number of frames extracted
@@ -97,8 +121,9 @@ def extract_frames(
             break
 
         if frame_idx >= start_frame and (frame_idx - start_frame) % every == 0:
+            resized = cv2.resize(frame, (width, height))
             out_path = out_dir / f"frame_{frame_idx:06d}.jpg"
-            cv2.imwrite(str(out_path), frame)
+            cv2.imwrite(str(out_path), resized, [cv2.IMWRITE_JPEG_QUALITY, quality])
             saved_count += 1
 
         frame_idx += 1
@@ -111,7 +136,16 @@ def extract_frames(
 def main() -> None:
     """Main entry point."""
     args = parse_args()
-    extract_frames(args.video, args.out_dir, args.every, args.start, args.end)
+    extract_frames(
+        args.video,
+        args.out_dir,
+        args.every,
+        args.start,
+        args.end,
+        args.width,
+        args.height,
+        args.quality,
+    )
 
 
 if __name__ == "__main__":
