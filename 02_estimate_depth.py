@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from typing import List
 
+import torch
 from PIL import Image
 from transformers import pipeline
 
@@ -33,6 +34,13 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default="LiheYoung/depth-anything-small-hf",
         help="Model ID for depth estimation",
+    )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="auto",
+        choices=["auto", "mps", "cuda", "cpu"],
+        help="Device for inference",
     )
     return parser.parse_args()
 
@@ -71,17 +79,38 @@ def validate_frames_dir(frames_dir: Path) -> List[Path]:
     return frames
 
 
-def load_model(model_id: str):
+def get_device(device_arg: str) -> str:
+    """Determine device to use for inference.
+
+    Args:
+        device_arg: Device argument from CLI (auto, mps, cuda, cpu)
+
+    Returns:
+        Device string for pipeline
+    """
+    if device_arg == "auto":
+        if torch.backends.mps.is_available():
+            return "mps"
+        elif torch.cuda.is_available():
+            return "cuda"
+        else:
+            return "cpu"
+    return device_arg
+
+
+def load_model(model_id: str, device: str):
     """Load depth estimation model via transformers pipeline.
 
     Args:
         model_id: HuggingFace model ID
+        device: Device to run model on
 
     Returns:
         Depth estimation pipeline
     """
     print(f"Loading model: {model_id}")
-    pipe = pipeline(task="depth-estimation", model=model_id)
+    print(f"Using device: {device}")
+    pipe = pipeline(task="depth-estimation", model=model_id, device=device)
     print("Model loaded successfully")
     return pipe
 
@@ -109,7 +138,8 @@ def main() -> None:
     print(f"Found {len(frames)} frames in {args.frames_dir}")
     print(f"Output directory: {args.out_dir}")
 
-    pipe = load_model(args.model)
+    device = get_device(args.device)
+    pipe = load_model(args.model, device)
 
     # Process first frame to verify model works
     if frames:
