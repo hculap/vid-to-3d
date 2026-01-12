@@ -1,0 +1,18 @@
+# Core numeric / IO
+numpy>=1.24
+pillow>=10.0
+tqdm>=4.66
+
+# Video decode / image processing
+opencv-python>=4.8
+
+# Depth estimation
+torch>=2.1
+transformers>=4.42
+accelerate>=0.33
+
+# Point cloud generation
+open3d>=0.18
+
+# Optional: nicer depth visualizations
+matplotlib>=3.8

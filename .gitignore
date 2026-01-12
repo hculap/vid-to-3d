@@ -1,0 +1,33 @@
+# Generated artifacts
+frames/
+depth/
+output/
+
+# Input videos (too large for git)
+input/*.mp4
+input/*.mov
+input/*.MOV
+input/*.MP4
+input/*.avi
+input/*.mkv
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Model cache (optional - can be large)
+# .cache/

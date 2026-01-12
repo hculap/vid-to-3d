@@ -1,0 +1,11 @@
+# progress.txt
+# Append one short entry after each completed PRD item.
+# Keep it concise. This file is "loop memory", not long-form documentation.
+#
+# Template:
+# - Date:
+# - PRD item:
+# - Summary:
+# - Files changed:
+# - Notes / next:
+
